@@ -1,63 +1,127 @@
 <!DOCTYPE html>
 <html>
 <head>
-  <meta charset="utf-8" />
-  <title>Mapa de Megaproyecto y problemáticas socioambientales</title>
+  <meta charset="UTF-8">
+  <title>Mapa de Megaproyectos</title>
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <link rel="stylesheet" href="https://unpkg.com/leaflet/dist/leaflet.css" />
   <style>
-    #map { height: 90vh; }
-    #search {
+    #mapa {
+      height: 90vh;
+    }
+
+    #buscar {
       margin: 10px;
       width: 300px;
       padding: 5px;
     }
+
+    .info-leyenda {
+      background: white;
+      padding: 6px 10px;
+      border-radius: 5px;
+      box-shadow: 0 0 15px rgba(0, 0, 0, 0.2);
+      font-size: 14px;
+    }
+
+    .info-leyenda i {
+      width: 18px;
+      height: 18px;
+      float: left;
+      margin-right: 8px;
+      opacity: 0.7;
+    }
   </style>
 </head>
 <body>
-  <input type="text" id="search" placeholder="Buscar proyecto..." />
-  <div id="map"></div>
+  <input type="text" id="buscar" placeholder="Buscar proyecto..." />
+  <div id="mapa"></div>
 
   <script src="https://unpkg.com/leaflet/dist/leaflet.js"></script>
   <script>
-    const map = L.map('map').setView([23.5, -102], 5);
+    const mapa = L.map('mapa').setView([23.5, -102], 5);
 
     L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
       attribution: '© OpenStreetMap'
-    }).addTo(map);
+    }).addTo(mapa);
 
     let proyectoLayer;
 
+    // Colores por tipo de megaproyecto
+    const coloresPorTipo = {
+      "Hidroeléctrico": "#1f78b4",
+      "Minero": "#33a02c",
+      "Carretero": "#ff7f00",
+      "Ferroviario": "#6a3d9a",
+      "Turístico": "#e31a1c",
+      "Energético": "#b15928",
+      "Otro": "#bbbbbb"
+    };
+
+    // Función para asignar color según tipo
+    function obtenerColor(tipo) {
+      return coloresPorTipo[tipo] || "#bbbbbb";
+    }
+
+    // Función para mostrar capa GeoJSON
     fetch('megaproyectos.geojson')
       .then(res => res.json())
-      .then(data => {
-        proyectoLayer = L.geoJSON(data, {
+      .then(datos => {
+        proyectoLayer = L.geoJSON(datos, {
+          pointToLayer: function (feature, latlng) {
+            return L.circleMarker(latlng, {
+              radius: 7,
+              fillColor: obtenerColor(feature.properties.Tipo),
+              color: "#000",
+              weight: 1,
+              opacity: 1,
+              fillOpacity: 0.8
+            });
+          },
           onEachFeature: function (feature, layer) {
             const props = feature.properties;
-            layer.bindPopup(`
-              <b>${props.Nombre}</b><br>
+            const contenido = `
+              <strong>${props.Nombre}</strong><br>
               Tipo: ${props.Tipo}<br>
               Estado: ${props.Estado}<br>
               Municipio: ${props.Municipio}<br>
-              Consulta indígena: ${props.Consulta_Indigena}<br>
-              Impacto ambiental: ${props.Impacto_Ambiental}<br>
-              Fuente: <a href="${props.Fuente}" target="_blank">Ver fuente</a>
-            `);
+              Consulta indígena: ${props.Consulta_Indígena}<br>
+              Impacto ambiental: ${props.Impacto_ambiental}<br>
+              Fuente: <a href="${props.Fuente}" target="_blank">ver fuente</a>
+            `;
+            layer.bindPopup(contenido);
           }
-        }).addTo(map);
-
-        // Buscador básico
-        document.getElementById('search').addEventListener('input', function () {
-          const value = this.value.toLowerCase();
-          proyectoLayer.eachLayer(layer => {
-            const nombre = layer.feature.properties.Nombre.toLowerCase();
-            if (nombre.includes(value)) {
-              map.setView(layer.getLatLng(), 9);
-              layer.openPopup();
-            }
-          });
-        });
+        }).addTo(mapa);
       });
+
+    // Búsqueda
+    document.getElementById('buscar').addEventListener('input', function () {
+      const valor = this.value.toLowerCase();
+      if (!proyectoLayer) return;
+
+      proyectoLayer.eachLayer(layer => {
+        const nombre = layer.feature.properties.Nombre.toLowerCase();
+        if (nombre.includes(valor)) {
+          layer.openPopup();
+          mapa.setView(layer.getLatLng(), 9);
+        }
+      });
+    });
+
+    // Leyenda
+    const leyenda = L.control({ position: 'bottomright' });
+
+    leyenda.onAdd = function () {
+      const div = L.DomUtil.create('div', 'info-leyenda');
+      div.innerHTML = '<strong>Tipo de proyecto</strong><br>';
+      for (let tipo in coloresPorTipo) {
+        div.innerHTML +=
+          `<i style="background:${coloresPorTipo[tipo]}"></i> ${tipo}<br>`;
+      }
+      return div;
+    };
+
+    leyenda.addTo(mapa);
   </script>
 </body>
 </html>
